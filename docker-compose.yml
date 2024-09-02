@@ -1,0 +1,71 @@
+version: '3'
+
+services:
+  # PHP-FPM service
+  php-fpm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/var/www
+      - ./php-fpm.conf:/usr/local/etc/php-fpm.d/www.conf
+    networks:
+      - laravel
+
+  # Nginx service
+  nginx:
+    image: nginx:latest
+    volumes:
+      - .:/var/www
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    ports:
+      - "80:80"
+    depends_on:
+      - php-fpm
+    networks:
+      - laravel
+
+  # PostgreSQL service
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_DB: laravel
+      POSTGRES_USER: laravel
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - laravel
+
+  # RabbitMQ service
+  rabbitmq:
+    image: rabbitmq:3-management
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "15672:15672" # RabbitMQ Management UI
+      - "5672:5672"   # RabbitMQ Port
+    networks:
+      - laravel
+
+  # Supervisor service
+  supervisor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: supervisord -c /etc/supervisord.conf
+    volumes:
+      - .:/var/www
+      - ./supervisord.conf:/etc/supervisord.conf
+    depends_on:
+      - php-fpm
+    networks:
+      - laravel
+
+networks:
+  laravel:
+    driver: bridge
+
+volumes:
+  postgres_data:

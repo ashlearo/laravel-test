@@ -1,0 +1,75 @@
+version: "3.3"
+services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./src:/var/www
+      - ./public:/var/www/public
+    depends_on:
+      - php-fpm
+    networks:
+      - app-network
+
+  php-fpm:
+    build:
+      context: ./src
+      dockerfile: Dockerfile
+    volumes:
+      - ./src:/var/www
+      - ./public:/var/www/public
+    networks:
+      - app-network
+    depends_on:
+      - postgresql
+      - rabbitmq
+    environment:
+      - POSTGRES_HOST=postgresql
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=laravel
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASSWORD=guest
+      - RABBITMQ_VHOST=/
+    expose:
+      - 9000
+
+  supervisor:
+    image: alpine/supervisord
+    volumes:
+      - ./src/supervisord.conf:/etc/supervisord.conf
+      - ./src/php-fpm.conf:/etc/php-fpm.d/www.conf
+    depends_on:
+      - php-fpm
+    networks:
+      - app-network
+
+  postgresql:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: laravel
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "15672:15672"
+      - "5672:5672"
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+volumes:
+  postgres_data:
